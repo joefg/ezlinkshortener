@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width">
+
+	<title>{{ title }}</title>
+
+	<script type="module">
+		document.documentElement.classList.remove('no-js');
+		document.documentElement.classList.add('js');
+	</script>
+</head>
+
+<body>
+	<!-- Content -->
+
+	<h1>{{ title }}</h1>
+
+	<h2>big link goes in, short link comes out</h2>
+
+	<a href="{{ long_url }}">{{ long_url }}</a>
+
+	<a href="{{ short_url }}">{{ short_url }}</a>
+</body>
+</html>
