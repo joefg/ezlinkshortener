@@ -1,6 +1,8 @@
 import os
 import sqlite3
 
+SQL_LOCATION = 'sql/'
+
 def connect(location):
     def factory(cursor, row):
         d = {}
@@ -13,3 +15,12 @@ def connect(location):
     cur = conn.cursor()
 
     return conn, cur
+
+def create(location):
+    conn, cur = connect(os.path.join(location))
+
+    with open(os.path.join(SQL_LOCATION, 'base.sql'), 'r') as base:
+        cur.executescript(base.read())
+
+    conn.commit()
+    conn.close()
