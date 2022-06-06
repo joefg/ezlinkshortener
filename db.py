@@ -6,12 +6,16 @@ import sqlite3
 
 SQL_LOCATION = 'sql/'
 
-def connect(location):
+def connect(location, debug=False):
     def factory(cursor, row):
         d = {}
         for idx, col in enumerate(cursor.description):
             d[col[0].lower()] = row[idx]
         return d
+
+    def trace_callback(error):
+        logging.error("Database trace:")
+        logging.error(error)
 
     if os.path.exists(os.path.join(location)):
         conn = sqlite3.connect(os.path.join(location))
@@ -19,6 +23,9 @@ def connect(location):
         cur = conn.cursor()
     else:
         raise Exception("Database does not exist. No connection created.")
+
+    if debug:
+        conn.set_trace_callback(trace_callback)
 
     return conn, cur
 
@@ -42,6 +49,12 @@ def update(location):
 
     conn.commit()
     conn.close()
+
+def drop(location):
+    try:
+        os.remove(os.path.join(location))
+    except OSError:
+        pass
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
