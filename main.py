@@ -11,6 +11,8 @@ import fastapi.templating
 import uvicorn
 import pydantic
 
+import db
+
 logging.getLogger(__name__)
 
 app = fastapi.FastAPI()
@@ -18,19 +20,6 @@ templates = fastapi.templating.Jinja2Templates(directory='templates')
 
 class Link(pydantic.BaseModel):
     url: str
-
-def db(location):
-    def factory(cursor, row):
-        d = {}
-        for idx, col in enumerate(cursor.description):
-            d[col[0].lower()] = row[idx]
-        return d
-
-    conn = sqlite3.connect(os.path.join(location))
-    conn.row_factory = factory
-    cur = conn.cursor()
-
-    return conn, cur
 
 def search_hash(hash):
     args = {
@@ -42,7 +31,7 @@ def search_hash(hash):
         WHERE hash=:hash
         LIMIT 1;
     '''
-    conn, cur = db('data/service.db')
+    conn, cur = db.connect('data/service.db')
     cur.execute(sql, args)
     res = cur.fetchall()
     conn.close()
@@ -59,7 +48,7 @@ def insert_link(hash, url):
         VALUES (:hash, :url)
         RETURNING *;
     '''
-    conn, cur = db('data/service.db')
+    conn, cur = db.connect('data/service.db')
 
     try:
         cur.execute(sql, args)
