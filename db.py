@@ -13,9 +13,9 @@ def connect(location, debug=False):
             d[col[0].lower()] = row[idx]
         return d
 
-    def trace_callback(error):
-        logging.error("Database trace:")
-        logging.error(error)
+    def trace_callback(msg):
+        logging.debug("Database trace:")
+        logging.debug(msg)
 
     if os.path.exists(os.path.join(location)):
         conn = sqlite3.connect(os.path.join(location))
@@ -35,7 +35,7 @@ def create(location):
 
     open(os.path.join(location), 'a').close()
 
-    conn, cur = connect(os.path.join(location))
+    conn, cur = connect(os.path.join(location), debug=True)
 
     with open(os.path.join(SQL_LOCATION, 'base.sql'), 'r') as base:
         cur.executescript(base.read())
@@ -44,10 +44,42 @@ def create(location):
     conn.close()
 
 def update(location):
-    raise NotImplementedError("Not implemented yet.")
-    conn, cur = connect(os.path.join(location))
+    exclude = ('base.sql')
+    files = [f for f in os.listdir(os.path.join('sql')) if f[-3:] == 'sql' and f not in exclude]
 
-    conn.commit()
+    conn, cur = connect(os.path.join(location), debug=True)
+
+    sql = '''
+        SELECT filename
+        FROM schema_changes
+        ORDER BY executed asc;
+    '''
+
+    cur.execute(sql)
+    res = cur.fetchall()
+    executed = [i['filename'] for i in res]
+
+    for file in files:
+        if file not in exclude and file not in executed:
+            logging.info(f"Script: {file}")
+
+            with open(os.path.join(SQL_LOCATION, file), 'r') as script:
+                try:
+                    cur.executescript(script.read())
+
+                    query = '''
+                        INSERT INTO schema_changes (filename, executed)
+                        VALUES (:filename, datetime());
+                    '''
+                    cur.execute(query, {'filename' : file})
+
+                    conn.commit()
+
+                    logging.info("Script executed successfully.")
+                except:
+                    logging.exception("Error applying update.")
+                    conn.rollback()
+
     conn.close()
 
 def drop(location):
@@ -90,7 +122,7 @@ if __name__ == '__main__':
     if args['verbose']:
         logging.basicConfig(level=logging.DEBUG)
     else:
-        logging.basicConfig(level=logging.WARN)
+        logging.basicConfig(level=logging.INFO)
 
     logging.debug("Arguments:" + str(args))
 
