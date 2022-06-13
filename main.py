@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import logging
 import sqlite3
+import functools
 
 import fastapi
 import fastapi.responses
@@ -12,16 +13,21 @@ import uvicorn
 import pydantic
 
 import db
+from config import Settings
 
 logging.getLogger(__name__)
 
 app = fastapi.FastAPI()
 templates = fastapi.templating.Jinja2Templates(directory='templates')
 
+@functools.lru_cache()
+def get_settings():
+    return Settings()
+
 class Link(pydantic.BaseModel):
     url: str
 
-def search_hash(hash):
+def search_hash(hash, store):
     args = {
         'hash' : hash
     }
@@ -31,14 +37,14 @@ def search_hash(hash):
         WHERE hash=:hash
         LIMIT 1;
     '''
-    conn, cur = db.connect('data/service.db')
+    conn, cur = db.connect(store)
     cur.execute(sql, args)
     res = cur.fetchall()
     conn.close()
 
     return res
 
-def insert_link(hash, url):
+def insert_link(hash, url, store):
     args = {
         'hash' : hash,
         'url'  : url
@@ -48,7 +54,7 @@ def insert_link(hash, url):
         VALUES (:hash, :url)
         RETURNING *;
     '''
-    conn, cur = db.connect('data/service.db')
+    conn, cur = db.connect(store)
 
     try:
         cur.execute(sql, args)
@@ -76,30 +82,31 @@ def expand(hash, request):
     return 'http://' + str(request.url).split("/")[2:-1][0] + '/' + hash
 
 @app.get("/", response_class=fastapi.responses.HTMLResponse)
-async def serve_index(request: fastapi.Request):
-    return templates.TemplateResponse('index.html', {'request' : request, 'title' : 'ezlinkshortener'})
+async def serve_index(request: fastapi.Request, settings: Settings = fastapi.Depends(get_settings)):
+    params = {'request' : request, 'title' : settings.app_name}
+    return templates.TemplateResponse('index.html', params)
 
 @app.post("/make", response_class=fastapi.responses.HTMLResponse)
-async def make_url_form(request: fastapi.Request, url:str = fastapi.Form()):
+async def make_url_form(request: fastapi.Request, settings: Settings = fastapi.Depends(get_settings), url:str = fastapi.Form()):
     url = sanitise(url)
     hash = shorten(url)
 
-    insert_link(hash, url)
+    insert_link(hash, url, settings.datastore)
 
     vars = {
         'request' : request,
-        'title' : "ezlinkshortener",
+        'title' : settings.app_name,
         'long_url' : "http://" + sanitise(url),
         'short_url' : expand(shorten(sanitise(url)), request)
     }
     return templates.TemplateResponse('link.html', vars)
 
 @app.put("/api/make/")
-async def make_url(link: Link, request: fastapi.Request):
+async def make_url(link: Link, request: fastapi.Request, settings: Settings = fastapi.Depends(get_settings)):
     url = sanitise(link.url)
     hash = shorten(url)
 
-    insert = insert_link(hash, url)
+    insert = insert_link(hash, url, settings.datastore)
 
     if insert is None:
         raise fastapi.HTTPException(409, detail="Conflict")
@@ -107,8 +114,8 @@ async def make_url(link: Link, request: fastapi.Request):
     return { "url" : expand(hash, request) }
 
 @app.get("/{hash}")
-async def go_to_url(hash: str):
-    url = search_hash(hash)
+async def go_to_url(hash: str, settings: Settings = fastapi.Depends(get_settings)):
+    url = search_hash(hash, settings.datastore)
 
     if len(url) == 0:
         raise fastapi.HTTPException(404, detail="Item not found")
@@ -117,8 +124,8 @@ async def go_to_url(hash: str):
     return fastapi.responses.RedirectResponse('http://' + url)
 
 @app.get("/api/resolve/{hash}")
-async def get_url(hash: str):
-    url = search_hash(hash)
+async def get_url(hash: str, settings: Settings = fastapi.Depends(get_settings)):
+    url = search_hash(hash, settings.datastore)
 
     if len(url) == 0:
         raise fastapi.HTTPException(404, detail="Item not found")
