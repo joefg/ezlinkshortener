@@ -9,17 +9,30 @@ This is just a toy, I wanted to learn the nuts and bolts of [FastAPI](https://fa
 Very briefly:
 
 ```
-url -> function(url) = shortened -> return shortened
-shortened -> lookup(shortened) -> return url
+url       -> shorten(url)      = shortened -> return shortened
+shortened -> lookup(shortened) = url       -> return url
 ```
 
-## Testing
+## Configuration
+
+Bring your own `config.py`!
+
+```python
+import pydantic
+
+class Settings(pydantic.BaseSettings):
+    app_name: str = "ezlinkshortener"
+    datastore: str = "data/service.db"
+
+settings = Settings()
+```
+
+## Running
 
 This uses `pipenv` but there's a requirements.txt for people who want to use plain `virtualenv`.
 
-```
+```bash
 # Create pipenv
-
 pipenv shell;
 pipenv install -r requirements.txt;
 
@@ -28,6 +41,17 @@ pipenv install -r requirements.txt;
 
 # Running
 python3 main.py --port 5000
+```
+
+## Unit Tests
+
+```bash
+# Create pipenv
+pipenv shell;
+pipenv install -r requirements.txt;
+
+# Run unit tests
+python3 -m unittest test_main.py -vvv
 ```
 
 ## API Documentation
@@ -39,3 +63,4 @@ FastAPI has built-in documentation, so once you're running this, go to [your doc
 - Nicer frontend
 - Add authentication to the API
 - Extend data modelling so that we're not tied to sqlite (ie port to an ORM)
+- Much better sanitisation, at the moment it's horrible.
