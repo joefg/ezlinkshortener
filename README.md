@@ -37,7 +37,7 @@ pipenv shell;
 pipenv install -r requirements.txt;
 
 # Create test database (some data included)
-./create_db.sh
+python3 db.py data/service.db --verbose --create --update
 
 # Running
 python3 main.py --port 5000
